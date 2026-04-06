@@ -47,6 +47,8 @@ func main() {
 	defer func() {
 		if err := compressor.Close(); err != nil {
 			fmt.Printf("Error closing compressor: %v\n", err)
+
+			return
 		}
 		if err := bufTargetFile.Flush(); err != nil {
 			fmt.Printf("Error flushing buffer: %v\n", err)
@@ -56,8 +58,13 @@ func main() {
 	_, err = io.Copy(compressor, sourceFile)
 	if err != nil {
 		fmt.Printf("Error compressing sourceFile: %v\n", err)
+
 		return
 	}
 
 	return
+}
+
+func GetFailToCompressError(err error) error {
+	return fmt.Errorf("Error compressing sourceFile: %w", err)
 }
