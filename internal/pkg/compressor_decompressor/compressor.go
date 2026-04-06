@@ -6,8 +6,7 @@ import (
 )
 
 const (
-	MaxOrder int = 4
-	Escape   int = 1
+	Escape int = 1
 )
 
 type Encoder interface {
@@ -20,15 +19,17 @@ type Compressor struct {
 
 	encoder       Encoder
 	contextTree   *context_tree.ContextTree
+	maxOrder      int
 	slidingWindow *slidingWindow
 }
 
-func NewCompressor(dst io.Writer, encoder Encoder) *Compressor {
+func NewCompressor(dst io.Writer, encoder Encoder, maxOrder int) *Compressor {
 	return &Compressor{
 		dst:           dst,
 		encoder:       encoder,
-		contextTree:   context_tree.NewContextTree(MaxOrder),
-		slidingWindow: NewSlidingWindow(MaxOrder),
+		contextTree:   context_tree.NewContextTree(maxOrder),
+		maxOrder:      maxOrder,
+		slidingWindow: NewSlidingWindow(maxOrder),
 	}
 }
 
@@ -44,11 +45,11 @@ func (c *Compressor) Close() error {
 func (c *Compressor) compress(data []byte) []byte {
 
 	for _, sym := range data {
-		order := MaxOrder
+		order := c.maxOrder
 		context := c.slidingWindow.GetContext(order)
 
 		for order >= 0 {
-			probs := tree.GetProbabilities(context)
+			probs := c.contextTree.GetProbabilities(context)
 
 			if _, exists := probs[sym]; exists {
 				c.encoder.EncodeSymbol(sym, probs)
@@ -61,10 +62,10 @@ func (c *Compressor) compress(data []byte) []byte {
 		}
 
 		if order < 0 {
-			encoder.EncodeSymbolUniform(sym, 256)
+			c.encoder.EncodeSymbolUniform(sym, 256)
 		}
 
-		c.contextTree.Update(sym, c.slidingWindow.GetContext(MaxOrder))
+		c.contextTree.Update(sym, c.slidingWindow.GetContext(c.maxOrder))
 		c.slidingWindow.Push(sym)
 	}
 
