@@ -16,7 +16,7 @@ func TestSimple(t *testing.T) {
 	enc.Flush()
 	t.Logf("Encoded %d bytes", buf.Len())
 
-	dec, _ := NewArithmeticDecoder(&buf)
+	dec := NewArithmeticDecoder(&buf)
 	out := make([]byte, len(data))
 	for i := range out {
 		sym, err := dec.Decode(cum, total)

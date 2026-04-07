@@ -44,8 +44,7 @@ func TestEncoderDecoder(t *testing.T) {
 				t.Fatal("No data written")
 			}
 
-			dec, err := NewArithmeticDecoder(&buf)
-			require.NoError(t, err)
+			dec := NewArithmeticDecoder(&buf)
 
 			decoded := make([]byte, len(tt.symbols))
 			for i := 0; i < len(tt.symbols); i++ {
