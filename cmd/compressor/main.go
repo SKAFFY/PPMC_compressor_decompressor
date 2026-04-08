@@ -8,9 +8,17 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
+	"time"
 
 	"github.com/schollz/progressbar/v3"
 )
+
+func getMemUsage() string {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	return fmt.Sprintf("%.1f MB", float64(m.Alloc)/1024/1024)
+}
 
 func main() {
 	sourceFilePath := flag.String("f", "", "source file path")
@@ -72,9 +80,29 @@ func main() {
 	}
 
 	var reader io.Reader = sourceFile
+	var bar *progressbar.ProgressBar
 	if *showProgress && sourceSize > 0 {
-		bar := progressbar.DefaultBytes(sourceSize, "compressing")
+		bar = progressbar.DefaultBytes(sourceSize, "compressing")
 		reader = io.TeeReader(sourceFile, bar)
+	}
+
+	// Запускаем горутину для обновления описания прогресс-бара с использованием памяти
+	var stopCh chan struct{}
+	if bar != nil {
+		stopCh = make(chan struct{})
+		defer close(stopCh)
+		go func() {
+			ticker := time.NewTicker(500 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-stopCh:
+					return
+				case <-ticker.C:
+					bar.Describe(fmt.Sprintf("compressing (mem: %s)", getMemUsage()))
+				}
+			}
+		}()
 	}
 
 	_, err = io.Copy(compressor, reader)

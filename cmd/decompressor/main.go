@@ -5,9 +5,12 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"github.com/schollz/progressbar/v3"
 	"io"
 	"os"
+	"runtime"
+	"time"
+
+	"github.com/schollz/progressbar/v3"
 )
 
 type progressWriter struct {
@@ -23,6 +26,12 @@ func (pw *progressWriter) Write(p []byte) (n int, err error) {
 
 func (pw *progressWriter) Finish() {
 	_ = pw.bar.Finish()
+}
+
+func getMemUsage() string {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	return fmt.Sprintf("%.1f MB", float64(m.Alloc)/1024/1024)
 }
 
 func main() {
@@ -73,6 +82,25 @@ func main() {
 			pw = &progressWriter{w: targetFile, bar: bar}
 			writer = pw
 		}
+	}
+
+	// Запускаем горутину для обновления описания прогресс-бара с использованием памяти
+	var stopCh chan struct{}
+	if pw != nil {
+		stopCh = make(chan struct{})
+		defer close(stopCh)
+		go func() {
+			ticker := time.NewTicker(500 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-stopCh:
+					return
+				case <-ticker.C:
+					pw.bar.Describe(fmt.Sprintf("decompressing (mem: %s)", getMemUsage()))
+				}
+			}
+		}()
 	}
 
 	bufWriter := bufio.NewWriterSize(writer, 4*1024*1024)
