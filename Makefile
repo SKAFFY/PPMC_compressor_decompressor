@@ -91,11 +91,11 @@ test:
 test-e2e: build
 	$(GORUN) ./cmd/e2e
 
-# Запуск анализа Calgary corpus (автоматически скачивает датасет, если его нет)
+# Запуск анализа Calgary corpus (автоматически скачивает датасет, если его нет). Требует bin файл $(COMPRESSOR_BINARY)
 calgary: ensure-dataset $(BIN_DIR)/$(CALGARY_BINARY)
 	$(BIN_DIR)/$(CALGARY_BINARY) -dir=$(DIR)
 
-# Запуск анализа с сохранением результатов в файл (текстовая таблица)
+# Запуск анализа с сохранением результатов в файл (текстовая таблица). Требует bin файл $(COMPRESSOR_BINARY)
 calgary-save: ensure-dataset $(REPORTS_DIR) $(BIN_DIR)/$(CALGARY_BINARY)
 	$(BIN_DIR)/$(CALGARY_BINARY) -dir=$(DIR) -output=$(REPORTS_DIR)/calgary_$(shell date +%Y%m%d_%H%M%S).txt
 

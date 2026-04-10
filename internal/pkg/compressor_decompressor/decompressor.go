@@ -37,7 +37,7 @@ func NewDecompressor(r io.Reader) (*Decompressor, error) {
 		slidingWindow: sliding_window.NewSlidingWindow(maxOrder),
 		remaining:     originalSize,
 		originalSize:  originalSize,
-		contextBuf:    make([]byte, maxOrder), // буфер для контекста
+		contextBuf:    make([]byte, maxOrder),
 	}, nil
 }
 
@@ -57,7 +57,7 @@ func (d *Decompressor) Read(p []byte) (n int, err error) {
 		n++
 		d.remaining--
 
-		// обновление модели для всех суффиксов контекста
+		// Обновляем все суффиксы контекста (от maxOrder до 0)
 		for o := d.maxOrder; o >= 0; o-- {
 			ctx := d.slidingWindow.GetContext(o, d.contextBuf[:0])
 			d.contextTree.Update(byte(sym), ctx)

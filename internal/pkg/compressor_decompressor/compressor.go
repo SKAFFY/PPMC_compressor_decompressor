@@ -43,14 +43,12 @@ func NewCompressor(w io.Writer, encoder EncoderWriter, maxOrder int, originalSiz
 func (c *Compressor) Write(p []byte) (n int, err error) {
 	for _, sym := range p {
 		order := c.maxOrder
-		// получаем контекст максимального порядка, используя переиспользуемый буфер
 		context := c.slidingWindow.GetContext(order, c.contextBuf[:0])
 
 		for order >= 0 {
 			node := c.contextTree.GetNode(context)
 			if node != nil && node.Freq[sym] > 0 {
-				// Символ найден – кодируем его, используя распределение с escape
-				escapeFreq := uint64(len(node.Freq)) // метод C
+				escapeFreq := uint64(len(node.Freq))
 				if escapeFreq == 0 {
 					escapeFreq = 1
 				}
@@ -59,7 +57,6 @@ func (c *Compressor) Write(p []byte) (n int, err error) {
 				PutCumFreq(cum)
 				break
 			} else {
-				// Символ не найден – кодируем escape и переходим к меньшему порядку
 				escapeFreq := uint64(1)
 				if node != nil {
 					escapeFreq = uint64(len(node.Freq))
@@ -72,12 +69,10 @@ func (c *Compressor) Write(p []byte) (n int, err error) {
 					c.encoder.Encode(Escape, cum, total)
 					PutCumFreq(cum)
 				} else {
-					// узел не существует – только escape с частотой 1
 					cum := make([]uint64, 258)
 					cum[257] = escapeFreq
 					c.encoder.Encode(Escape, cum, escapeFreq)
 				}
-
 				order--
 				if order >= 0 {
 					context = c.slidingWindow.GetContext(order, c.contextBuf[:0])
@@ -87,12 +82,11 @@ func (c *Compressor) Write(p []byte) (n int, err error) {
 		}
 
 		if order < 0 {
-			// Порядок -1: равномерное распределение по 256 символам
 			uniformCum, uniformTotal := GetUniformCumFreq()
 			c.encoder.Encode(int(sym), uniformCum, uniformTotal)
 		}
 
-		// Обновляем статистику для всех суффиксов контекста (от maxOrder до 0)
+		// Обновляем все суффиксы контекста (от maxOrder до 0)
 		for o := c.maxOrder; o >= 0; o-- {
 			ctx := c.slidingWindow.GetContext(o, c.contextBuf[:0])
 			c.contextTree.Update(sym, ctx)

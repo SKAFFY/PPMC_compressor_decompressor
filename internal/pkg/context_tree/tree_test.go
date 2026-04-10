@@ -58,8 +58,9 @@ func TestContextTree_UpdateAndGetNode(t *testing.T) {
 				expectedFreq int
 				expectedNode bool
 			}{
-				{[]byte{}, 'B', 2, true},
-				{[]byte{}, 'C', 1, true},
+				// Корень не обновляется автоматически
+				{[]byte{}, 'B', 0, true},
+				{[]byte{}, 'C', 0, true},
 				{[]byte{'x'}, 'B', 2, true},
 				{[]byte{'x'}, 'C', 1, true},
 				{[]byte{'y'}, 'B', 0, false},
@@ -83,12 +84,13 @@ func TestContextTree_UpdateAndGetNode(t *testing.T) {
 				expectedFreq int
 				expectedNode bool
 			}{
-				{[]byte{}, 'D', 2, true},
-				{[]byte{}, 'E', 1, true},
-				{[]byte{}, 'F', 1, true},
-				{[]byte{'a'}, 'D', 2, true},
-				{[]byte{'a'}, 'E', 1, true},
-				{[]byte{'a'}, 'F', 1, true},
+				// Корень и контекст 'a' не обновляются
+				{[]byte{}, 'D', 0, true},
+				{[]byte{}, 'E', 0, true},
+				{[]byte{}, 'F', 0, true},
+				{[]byte{'a'}, 'D', 0, true},
+				{[]byte{'a'}, 'E', 0, true},
+				{[]byte{'a'}, 'F', 0, true},
 				{[]byte{'a', 'b'}, 'D', 2, true},
 				{[]byte{'a', 'b'}, 'E', 1, true},
 				{[]byte{'a', 'b'}, 'F', 1, true},
@@ -112,12 +114,13 @@ func TestContextTree_UpdateAndGetNode(t *testing.T) {
 				expectedFreq int
 				expectedNode bool
 			}{
-				{[]byte{}, 'X', 2, true},
-				{[]byte{}, 'Y', 1, true},
+				// Корень не обновляется
+				{[]byte{}, 'X', 0, true},
+				{[]byte{}, 'Y', 0, true},
 				{[]byte{'p'}, 'X', 1, true},
 				{[]byte{'p'}, 'Y', 1, true},
 				{[]byte{'q'}, 'X', 1, true},
-				{[]byte{'q'}, 'Y', 0, true}, // узел существует, но Y не встречался после 'q'
+				{[]byte{'q'}, 'Y', 0, true},
 			},
 		},
 	}
@@ -141,16 +144,16 @@ func TestContextTree_UpdateAndGetNode(t *testing.T) {
 					continue
 				}
 				require.NotNil(t, node, "context %v should exist", check.context)
-				Freq := node.Freq[check.expectedSym] // отсутствие ключа даёт 0
-				assert.Equal(t, check.expectedFreq, Freq, "context %v Freq[%c]", check.context, check.expectedSym)
+				freq := node.Freq[check.expectedSym]
+				assert.Equal(t, check.expectedFreq, freq, "context %v Freq[%c]", check.context, check.expectedSym)
 			}
 		})
 	}
 }
 
-func sumFreq(Freq map[byte]int) int {
+func sumFreq(freq map[byte]int) int {
 	sum := 0
-	for _, v := range Freq {
+	for _, v := range freq {
 		sum += v
 	}
 	return sum
@@ -172,14 +175,31 @@ func TestContextTree_GetNodeNonExistent(t *testing.T) {
 
 func TestContextTree_MaxOrderNotExceeded(t *testing.T) {
 	tree := NewContextTree(2)
+
+	// Обновляем контекст длины 3 (длиннее maxOrder)
 	longContext := []byte{'x', 'y', 'z'}
 	tree.Update('b', longContext)
 
+	// Узел для контекста длины 2 (первые два байта) создаётся при проходе, но частота не увеличивается
 	nodeXY := tree.GetNode([]byte{'x', 'y'})
 	require.NotNil(t, nodeXY)
-	assert.Equal(t, 1, nodeXY.Freq['b'])
+	assert.Equal(t, 0, nodeXY.Freq['b'])
+	assert.Equal(t, 0, nodeXY.Total)
 
+	// Узел для полного контекста (длина 3) должен иметь частоту 1
 	nodeXYZ := tree.GetNode([]byte{'x', 'y', 'z'})
 	require.NotNil(t, nodeXYZ)
 	assert.Equal(t, 1, nodeXYZ.Freq['b'])
+	assert.Equal(t, 1, nodeXYZ.Total)
+
+	// Обновляем контекст "xy" отдельно
+	tree.Update('c', []byte{'x', 'y'})
+	nodeXY = tree.GetNode([]byte{'x', 'y'})
+	assert.Equal(t, 1, nodeXY.Freq['c'])
+	assert.Equal(t, 1, nodeXY.Total)
+
+	// Узел "xyz" не должен измениться
+	nodeXYZ = tree.GetNode([]byte{'x', 'y', 'z'})
+	assert.Equal(t, 1, nodeXYZ.Freq['b'])
+	assert.Equal(t, 1, nodeXYZ.Total)
 }
