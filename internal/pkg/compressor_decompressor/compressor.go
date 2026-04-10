@@ -51,6 +51,9 @@ func (c *Compressor) Write(p []byte) (n int, err error) {
 			if node != nil && node.Freq[sym] > 0 {
 				// Символ найден – кодируем его, используя распределение с escape
 				escapeFreq := uint64(len(node.Freq)) // метод C
+				if escapeFreq == 0 {
+					escapeFreq = 1
+				}
 				cum, total := GetCumFreqWithEscape(node.Freq, escapeFreq)
 				c.encoder.Encode(int(sym), cum, total)
 				PutCumFreq(cum)
@@ -59,7 +62,10 @@ func (c *Compressor) Write(p []byte) (n int, err error) {
 				// Символ не найден – кодируем escape и переходим к меньшему порядку
 				escapeFreq := uint64(1)
 				if node != nil {
-					escapeFreq = uint64(len(node.Freq)) // метод C
+					escapeFreq = uint64(len(node.Freq))
+					if escapeFreq == 0 {
+						escapeFreq = 1
+					}
 				}
 				if node != nil {
 					cum, total := GetCumFreqWithEscape(node.Freq, escapeFreq)
@@ -86,9 +92,11 @@ func (c *Compressor) Write(p []byte) (n int, err error) {
 			c.encoder.Encode(int(sym), uniformCum, uniformTotal)
 		}
 
-		// Обновляем статистику для всех суффиксов контекста максимальной длины
-		fullContext := c.slidingWindow.GetContext(c.maxOrder, c.contextBuf[:0])
-		c.contextTree.Update(sym, fullContext)
+		// Обновляем статистику для всех суффиксов контекста (от maxOrder до 0)
+		for o := c.maxOrder; o >= 0; o-- {
+			ctx := c.slidingWindow.GetContext(o, c.contextBuf[:0])
+			c.contextTree.Update(sym, ctx)
+		}
 		c.slidingWindow.Push(sym)
 	}
 	return len(p), nil

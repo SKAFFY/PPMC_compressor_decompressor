@@ -57,9 +57,11 @@ func (d *Decompressor) Read(p []byte) (n int, err error) {
 		n++
 		d.remaining--
 
-		// обновление модели
-		fullContext := d.slidingWindow.GetContext(d.maxOrder, d.contextBuf[:0])
-		d.contextTree.Update(byte(sym), fullContext)
+		// обновление модели для всех суффиксов контекста
+		for o := d.maxOrder; o >= 0; o-- {
+			ctx := d.slidingWindow.GetContext(o, d.contextBuf[:0])
+			d.contextTree.Update(byte(sym), ctx)
+		}
 		d.slidingWindow.Push(byte(sym))
 	}
 
@@ -78,35 +80,32 @@ func (d *Decompressor) decodeNextSymbol() (int, error) {
 	for order >= 0 {
 		node := d.contextTree.GetNode(context)
 
-		if node != nil && node.Total > 0 {
+		if node != nil && len(node.Freq) > 0 {
 			// Узел существует и имеет статистику
-			escapeFreq := uint64(len(node.Freq)) // метод C
+			escapeFreq := uint64(len(node.Freq))
 			cum, total := GetCumFreqWithEscape(node.Freq, escapeFreq)
 
 			sym, err := d.decoder.Decode(cum, total)
-			PutCumFreq(cum) // немедленно возвращаем в пул
+			PutCumFreq(cum)
 
 			if err != nil {
-				return 0, fmt.Errorf("decode error at order %d: %w", order, err)
+				return 0, err
 			}
-
 			if sym != Escape {
 				return sym, nil
 			}
 			// Escape – переходим к меньшему порядку
 		} else {
+			// Узел отсутствует или пуст – декодируем escape с частотой 1
 			cum := make([]uint64, 258)
 			cum[257] = 1
-
 			sym, err := d.decoder.Decode(cum, 1)
 			if err != nil {
-				return 0, fmt.Errorf("escape decode error at order %d: %w", order, err)
+				return 0, err
 			}
-
 			if sym != Escape {
-				return 0, fmt.Errorf("expected Escape (256), got %d at order %d", sym, order)
+				return 0, fmt.Errorf("expected Escape, got %d", sym)
 			}
-			// Escape – переходим к меньшему порядку
 		}
 
 		order--
@@ -115,11 +114,7 @@ func (d *Decompressor) decodeNextSymbol() (int, error) {
 		}
 	}
 
-	// order == -1: равномерное распределение по 256 символам
+	// order == -1: равномерное распределение
 	uniformCum, uniformTotal := GetUniformCumFreq()
-	sym, err := d.decoder.Decode(uniformCum, uniformTotal)
-	if err != nil {
-		return 0, fmt.Errorf("decode error at uniform order: %w", err)
-	}
-	return sym, nil
+	return d.decoder.Decode(uniformCum, uniformTotal)
 }

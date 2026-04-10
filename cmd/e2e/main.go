@@ -25,7 +25,7 @@ func run() error {
 	defer os.RemoveAll(tmpDir)
 
 	original := filepath.Join(tmpDir, "original")
-	compressed := filepath.Join(tmpDir, "compressed.ppma")
+	compressed := filepath.Join(tmpDir, "compressed.ppmc")
 	decompressed := filepath.Join(tmpDir, "decompressed")
 
 	const size = 1 << 20
@@ -33,8 +33,8 @@ func run() error {
 		return err
 	}
 
-	compressBin := "./bin/ppma_compress"
-	decompressBin := "./bin/ppma_decompress"
+	compressBin := "./bin/ppmc_compress"
+	decompressBin := "./bin/ppmc_decompress"
 
 	cmdComp := exec.Command(compressBin, "-f", original, "-t", compressed)
 	if out, err := cmdComp.CombinedOutput(); err != nil {
